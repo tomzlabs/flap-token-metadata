@@ -19,11 +19,13 @@ def main() -> None:
     parser = ArgumentParser()
     parser.add_argument("collection_root", type=Path)
     parser.add_argument("destination_root", type=Path)
+    parser.add_argument("--limit", type=int, default=3000)
     args = parser.parse_args()
 
     manifest_path = args.collection_root / "accepted-batches.json"
     manifest = json.loads(manifest_path.read_text())
     accepted_count = manifest["acceptedCount"]
+    publish_count = min(args.limit, accepted_count)
     legendary_ids = set(manifest["legendaryChickenPoop"]["tokenIds"])
 
     images_dir = args.destination_root / "chunky-monkeys" / "images"
@@ -36,6 +38,8 @@ def main() -> None:
     for batch in manifest["batches"]:
         batch_dir = args.collection_root / batch["path"]
         for token_id in range(batch["from"], batch["to"] + 1):
+            if token_id > publish_count:
+                break
             source = batch_dir / f"monkey-{token_id:05d}.png"
             if not source.exists():
                 raise SystemExit(f"Missing accepted image: {source}")
@@ -71,10 +75,10 @@ def main() -> None:
             )
             imported += 1
 
-    expected_ids = set(range(1, accepted_count + 1))
+    expected_ids = set(range(1, publish_count + 1))
     actual_image_ids = {int(path.stem) for path in images_dir.glob("*.png")}
     actual_metadata_ids = {int(path.stem) for path in metadata_dir.glob("*.json")}
-    if imported != accepted_count or actual_image_ids != expected_ids:
+    if imported != publish_count or actual_image_ids != expected_ids:
         raise SystemExit("Imported image IDs do not match accepted manifest")
     if actual_metadata_ids != expected_ids:
         raise SystemExit("Generated metadata IDs do not match accepted manifest")
